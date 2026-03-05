@@ -1,77 +1,138 @@
 import os
+import argparse
 from glob import glob
-from tqdm import tqdm
+from PIL import Image
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from PIL import Image
-import requests
+from tqdm import tqdm
 
-
-from transformers import AutoProcessor, AutoModel
 import torch
+from transformers import AutoProcessor, AutoModel
 
 # checkpoint = "openai/clip-vit-large-patch14"
 # checkpoint = "gzomer/clip-multilingual"
-checkpoint = "google/siglip-so400m-patch14-384"
+# checkpoint = "google/siglip-so400m-patch14-384"
 
 
-############################################################################
-############################# LOAD DATA #################################### 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("images", help="Directory of image files")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="scores.csv",
+        help="File to write CSV results to. Default `scores.csv`",
+    )
+    parser.add_argument(
+        "-t", "--terms", default="terms.csv", help="File of terms. Default `terms.csv`"
+    )
+    parser.add_argument(
+        "-l",
+        "--language",
+        default="en",
+        help="Language of terms to use. Default `en`",
+        choices=["en", "nl"],
+    )
+    parser.add_argument(
+        "-b", "--batch-size", type=int, default=32, help="Batch size. Default 32"
+    )
+    parser.add_argument(
+        "-d",
+        "--device",
+        help="Device to compute on, e.g. `cuda`, `cpu`. If not specified, attempts default CUDA device, otherwise CPU",
+    )
+    parser.add_argument(
+        "-c",
+        "--checkpoint",
+        default="google/siglip-so400m-patch14-384",
+        help="Model checkpoint to load. Default `google/siglip-so400m-patch14-384`",
+    )
 
-terms = pd.read_csv("./inference/terms.csv")
-tags_EN = list(terms.label_en)
-# image_files = pd.Series(sorted(glob("./20260301/data/TTP_images/*.jpg")))
+    args = parser.parse_args()
 
-IMAGE_FOLDER = "./S3Bucket/bucket_files"
-image_files = glob(os.path.join(IMAGE_FOLDER, "*.jpg"))
-image_files = pd.Series(sorted(image_files)[:50], name="filename").apply(lambda f: os.path.split(f)[-1])
-# images_files.index = image_files
+    if args.device:
+        device = args.device
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-if not os.path.exists("scores.csv"):
-    scores = np.zeros((len(image_files), len(tags_EN)))
-    scores = pd.DataFrame(scores, index=image_files, columns=tags_EN)
-    scores.to_csv("scores.csv", index=True)
-else:
-    scores = pd.read_csv("scores.csv").set_index("filename")
-    skip = scores[(scores.abs() > 0.).sum(1) == len(scores.columns)].index
-    print(f"SKIPPING: {len(skip)} images! ({skip[:7]}, ...)") 
-    image_files = image_files[~image_files.isin(skip)]
+    print(f"Computing on: {device}")
 
-############################################################################
-############################# INIT MODEL ################################### 
+    ############################################################################
+    ############################# LOAD DATA ####################################
+
+    print(f"Loading terms from {args.terms} and labels in {args.language.upper()}")
+    terms = pd.read_csv(args.terms)
+    term_heading = f"label_{args.language.lower()}"
+    tags = list(terms[term_heading])
+
+    image_dir = Path(args.images)
+
+    save_fn = Path(args.output)
+
+    image_files = glob(str(image_dir / "*.jpg"))
+    image_files = pd.Series(sorted(image_files), name="filename").apply(
+        lambda f: os.path.basename(f)
+    )
+
+    if not os.path.exists(save_fn):
+        print(f"Creating {save_fn}...")
+        scores = np.zeros((len(image_files), len(tags)))
+        scores = pd.DataFrame(scores, index=image_files.tolist(), columns=tags)
+        scores.to_csv(save_fn, index=True)
+    else:
+        print(f"{save_fn} exists, checking which files to skip...")
+        scores = pd.read_csv(save_fn).set_index("filename")
+        skip = scores[(scores.abs() > 0.0).sum(1) == len(scores.columns)].index
+
+        print(f"SKIPPING: {len(skip)} images! ({skip[:7]}, ...)")
+
+        image_files = image_files[~image_files.isin(skip.tolist())]
+
+    ############################################################################
+    ############################# INIT MODEL ###################################
+
+    print("Initialising model...")
+    print(f"Loading Checkpoint: {args.checkpoint} to {device}")
+
+    model = AutoModel.from_pretrained(args.checkpoint).to(device)
+    processor = AutoProcessor.from_pretrained(args.checkpoint)
+
+    ############################################################################
+    ############################# APPLY ########################################
+
+    def get_scores(imgs):
+        inputs = processor(
+            text=tags, images=imgs, padding="max_length", return_tensors="pt"
+        ).to(device)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        return outputs.logits_per_image.detach().cpu().numpy()
+
+    print(f"Number of image_files: {len(image_files)}")
+    batches = np.array_split(image_files, len(image_files) // args.batch_size)
+
+    for i, b in enumerate(tqdm(batches)):
+        imgs = []
+        for file in b:
+            try:
+                imgs.append(Image.open(image_dir / file).convert("RGB"))
+            except Exception as e:
+                print(f"Exception loading file {image_dir / file}")
+                print(e)
+                continue
+
+        cur_scores = get_scores(imgs)
+
+        scores.loc[b] = cur_scores
+        scores.round(3).to_csv(save_fn)
+
+        for i in imgs:
+            i.close()
 
 
-
-model = AutoModel.from_pretrained(checkpoint)
-processor = AutoProcessor.from_pretrained(checkpoint)
-
-############################################################################
-############################# APPLY ######################################## 
-
-def get_scores(imgs):
-    inputs = processor(text=tags_EN, images=imgs, padding="max_length", return_tensors="pt")
-    
-    with torch.no_grad():
-        outputs = model(**inputs)
-    
-    return outputs.logits_per_image.numpy()
-
-
-
-BATCH_SIZE = 8
-batches = np.array_split(image_files, len(image_files)//BATCH_SIZE)
-
-
-for i, b in enumerate(tqdm(batches)):
-    imgs = [Image.open(os.path.join(IMAGE_FOLDER, f)) for f in b]
-    cur_scores = get_scores(imgs)
-
-    scores.loc[b] = cur_scores
-    scores.round(3).to_csv("scores.csv")
-    # scores.extend(cur_scores)
-    # processed.extend(b)
-    for i in imgs: i.close()
-    
-# df = pd.DataFrame(scores, index=processed, columns=tags_EN)
-# df = df.round(3)
-    
+if __name__ == "__main__":
+    main()
