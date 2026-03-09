@@ -1,0 +1,75 @@
+term_ID,label_nl,label_en
+10007042,Gebeurtenis,Event
+10049734,Bruiloft,Wedding
+10049916,Voorstelling of concert,Performance or concert
+10079310,Dansende mensen,Dancing people
+10048393,Begrafenis of crematie,Funeral
+10079085,Verkeersongeluk,Traffic accident
+10079086,Brand,Fire
+25127,Politie of leger (krijgsmacht),Police or army (armed forces)
+10048782,Optocht,Procession
+10066470,Markt,Marketplace
+10047928,Jachttafereel,Hunting scene
+10047935,Visvangst,Fishing
+10067158,Portret,Portrait
+10079127,Studioportret,Studio portrait
+10079313,Dubbelportret,Double portrait
+10067159,Groepsportret,Group portrait
+10067321,Luchtfoto,Aerial photograph
+10067195,Interieur,Interior view
+10066697,Klaslokaal (interieur),Classroom (interior)
+,Fabriek (interieur),Factory (interior)
+,Religieus gebouw (interieur),Religious structure (interior)
+,Gezondheidsvoorziening (interieur),Healthcare facility (interior)
+10066296,Bebouwde omgeving (exterieur),Built environment
+10066396,Straat of Weg,Street or road
+10066421,Plein,Square (open space)
+10066966,Brug,Bridge
+10066410,Park (openbare ruimte),Park (recreation area)
+10066446,Begraafplaats,Burial ground
+10066872,Zwembad,Swimming pool
+10066403,Sportterrein,Sports field
+10066404,Tennisveld,Tennis court
+10066405,Voetbalveld,Foutball pitch
+10066482,Militair terrein,Military base
+10066777,Fort,Fort
+10066484,Militair veldkampement,Military field base
+10066952,Religieus gebouw,Religious structure
+10066958,Moskee,Mosque
+10066957,Kerk,Church
+10066959,Tempel,Temple
+10067456,Tempelreliëf,Temple Reliefs
+10067114,Huis of gebouw (overig),House or building (other)
+10066825,Schoolgebouw,School building
+10066801,Winkel,Store
+10066833,Gezondheidsvoorziening,Healthcare facility
+10067009,Paalwoning,Stilt house
+10067022,Paleis,Palace
+10067111,Ruïne,Ruin
+10066893,Industrie en transport,Industry and transport
+10066442,Haven of Scheepswerf,Port or shipyard
+10066441,Luchthaven,Airport
+10068770,Spoorwegtransport,Railroad
+10066458,Fabriek of Krachtcentrale,Factory or power station
+10066460,Mijn,Mine (industrial complex)
+10066327,Agrarisch landschap,Agricultural land
+10047948,Veehouderij,Husbandry
+10066453,Plantage,Plantation
+10066457,Rijstveld(en),Rice field
+10066332,Natuurlandschap,Natural landscape
+10066367,Berg(en),Mountain
+10066363,Rotsen of rotsachtig gebied,Rocks (landform)
+10066357,Grot(ten),Cave
+10066352,Kust,Coast (coastline)
+10066361,Vulkaan,Volcano
+10048174,Vulkaanuitbarsting,Volcanic eruption
+10066373,Bos,Wood (plant community)
+10066371,Grasland,Grassland (plant community)
+10066364,Vallei,Valley (landform)
+10066333,Wateroppervlakte,Expanse of water
+10066346,Watermassa (zee of meer),Bodies of water (sea or lake)
+10066347,Baai,Bay
+10066341,Rivier,River
+10066798,Kanaal,Canal
+10066343,Waterval,Waterfall
+10079064,Overstroming,Flood
