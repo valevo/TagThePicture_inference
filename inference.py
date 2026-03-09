@@ -117,9 +117,11 @@ def main():
 
     for i, b in enumerate(tqdm(batches)):
         imgs = []
+        files = []
         for file in b:
             try:
                 imgs.append(Image.open(image_dir / file).convert("RGB"))
+                files.append(file)
             except Exception as e:
                 print(f"Exception loading file {image_dir / file}")
                 print(e)
@@ -127,7 +129,7 @@ def main():
 
         cur_scores = get_scores(imgs)
 
-        scores.loc[b] = cur_scores
+        scores.loc[files] = cur_scores
         scores.round(3).to_csv(save_fn)
 
         for i in imgs:
