@@ -20,8 +20,9 @@ from transformers import AutoProcessor, AutoModel, AutoModelForZeroShotObjectDet
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("images", help="Directory of image files")
-    parser.add_argument("checkpoint",
-                        help="Model checkpoint to load; no default.",
+    parser.add_argument(
+        "checkpoint",
+        help="Model checkpoint to load; no default.",
     )
 
     parser.add_argument(
@@ -31,7 +32,10 @@ def main():
         help="Folder to write pickled outputs to. Default `./object_scores/`",
     )
     parser.add_argument(
-        "-t", "--terms", default="object_terms.csv", help="File of object terms. Default `object_terms.csv`"
+        "-t",
+        "--terms",
+        default="object_terms.csv",
+        help="File of object terms. Default `object_terms.csv`",
     )
     parser.add_argument(
         "-l",
@@ -77,7 +81,7 @@ def main():
 
     if not os.path.exists(save_folder):
         print(f"Creating {save_folder}...")
-        os.path.makedirs(save_folder)
+        os.makedirs(save_folder)
     else:
         print("Warning! Folder already exists!")
 
@@ -101,28 +105,29 @@ def main():
     print("Initialising model...")
     print(f"Loading Checkpoint: {args.checkpoint} to {device}")
 
-    model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint)
+    model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint).to(
+        device
+    )
+    model.eval()
     processor = AutoProcessor.from_pretrained(args.checkpoint)
-    
+
     ############################################################################
     ############################# APPLY ########################################
 
     def get_scores(imgs):
         inputs = processor(text=tags, images=imgs, return_tensors="pt").to(device)
 
-        with torch.inference_mode():
+        with torch.no_grad():
             outputs = model(**inputs)
         return outputs
-
 
     print(f"Number of image_files: {len(image_files)}")
     batches = np.array_split(image_files, len(image_files) // args.batch_size)
 
     def pickle_outputs(iteration_number, filenames, outputs):
         to_pickle = (tuple(filenames), outputs)
-        with open(save_folder / f"outputs_{iteration_number:03d}.pkl", "wb") as handle:
+        with open(save_folder / f"outputs_{iteration_number:04d}.pkl", "wb") as handle:
             pickle.dump(to_pickle, handle)
-
 
     for i, b in enumerate(tqdm(batches)):
         imgs = []
@@ -139,12 +144,10 @@ def main():
         cur_scores = get_scores(imgs)
 
         pickle_outputs(i, used_files, cur_scores)
-        
-        
 
         # scores.loc[b] = cur_scores
-        # if i % 10: 
-            # scores.round(3).to_csv(save_fn)
+        # if i % 10:
+        # scores.round(3).to_csv(save_fn)
 
         for i in imgs:
             i.close()
