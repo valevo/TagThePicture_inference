@@ -139,7 +139,10 @@ def main():
         for f, cur in zip(files, detections):
             zipped = zip(cur["scores"], cur["boxes"], cur["text_labels"], cur["labels"], range(20))
             for s, b, l, l_id, j in zipped:
+                print(j)
                 recs.append([f, round(float(s), 3), *map(int, b), l, int(l_id)])
+
+        print("A", len(recs))
         return recs
  
 
@@ -166,6 +169,7 @@ def main():
                 continue
 
         detected = get_detections(used_files, imgs)
+        print("B", len(detected))
         results.extend(detected)
 
         # cur_scores = get_scores(imgs)
@@ -176,7 +180,7 @@ def main():
         # pickle_outputs(i, used_files, cur_scores)
 
         # scores.loc[b] = cur_scores
-        if i % 2 == 0:
+        if i % 10 == 0:
             cur_df = pd.DataFrame(results, 
                                   columns=COLUMN_NAMES)
             cur_df.to_csv(save_file, index=False, header=False, mode="a")
