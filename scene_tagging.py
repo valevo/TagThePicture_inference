@@ -130,7 +130,9 @@ def main():
         cur_scores = get_scores(imgs)
 
         scores.loc[files] = cur_scores
-        scores.round(3).to_csv(save_fn)
+
+        if i % 5 == 0:
+            scores.round(3).to_csv(save_fn)
 
         for i in imgs:
             i.close()

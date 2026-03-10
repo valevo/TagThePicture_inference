@@ -28,8 +28,8 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        default="./object_scores/",
-        help="Folder to write pickled outputs to. Default `./object_scores/`",
+        default="./object_scores.csv",
+        help="CSV file to write results to. Default `object_scores.csv`",
     )
     parser.add_argument(
         "-t",
@@ -72,18 +72,26 @@ def main():
 
     image_dir = Path(args.images)
 
-    save_folder = Path(args.output)
 
     image_files = glob(str(image_dir / "*.jpg"))
     image_files = pd.Series(sorted(image_files), name="filename").apply(
         lambda f: os.path.basename(f)
     )
 
-    if not os.path.exists(save_folder):
-        print(f"Creating {save_folder}...")
-        os.makedirs(save_folder)
-    else:
-        print("Warning! Folder already exists!")
+    save_file = Path(args.output)
+
+    COLUMN_NAMES = ["filename", "score", "box_x0", "box_y0", "box_x1", "box_y1", "tag", "tag_index"]
+
+    if os.path.exists(save_file):
+        df = pd.read_csv(save_file)
+        skip = set(df.filename.unique())
+        # skip = scores[(scores.abs() > 0.0).sum(1) == len(scores.columns)].index
+        image_files = image_files[~image_files.isin(skip)]
+        print(f"SKIPPING {len(skip)} images, as they already have scores!")
+    else: 
+        pd.DataFrame([], columns=COLUMN_NAMES).to_csv(save_file, index=False)
+        
+
 
     # if not os.path.exists(save_fn):
     #     print(f"Creating {save_fn}...")
@@ -92,12 +100,10 @@ def main():
     #     scores.to_csv(save_fn, index=True)
     # else:
     #     print(f"{save_fn} exists, checking which files to skip...")
-    #     scores = pd.read_csv(save_fn).set_index("filename")
-    #     skip = scores[(scores.abs() > 0.0).sum(1) == len(scores.columns)].index
+        # scores = pd.read_csv(save_fn).set_index("filename")
+        # skip = scores[(scores.abs() > 0.0).sum(1) == len(scores.columns)].index
 
-    #     print(f"SKIPPING {len(skip)} images, as they already have scores!")
 
-    #     image_files = image_files[~image_files.isin(skip.tolist())]
 
     ############################################################################
     ############################# INIT MODEL ###################################
@@ -121,6 +127,25 @@ def main():
             outputs = model(**inputs)
         return outputs
 
+
+    def get_detections(files, imgs):
+        outputs = get_scores(imgs)
+        
+        detections = processor.post_process_grounded_object_detection(
+            outputs, threshold=0.1, 
+            target_sizes=[(i.height, i.width) for i in imgs], 
+            text_labels=[tags]*len(imgs)
+        )
+
+        recs = []
+        for f, cur in zip(files, detections):
+            zipped = zip(cur["scores"], cur["boxes"], cur["text_labels"], cur["labels"], range(20))
+            for s, b, l, l_id, j in zipped:
+                recs.append([f, round(float(s), 3), *map(int, b), l, int(l_id)])
+        return recs
+ 
+
+    
     print(f"Number of image_files: {len(image_files)}")
     batches = np.array_split(image_files, len(image_files) // args.batch_size)
 
@@ -129,6 +154,7 @@ def main():
         with open(save_folder / f"outputs_{iteration_number:04d}.pkl", "wb") as handle:
             pickle.dump(to_pickle, handle)
 
+    results = []
     for i, b in enumerate(tqdm(batches)):
         imgs = []
         used_files = []
@@ -141,13 +167,21 @@ def main():
                 print(e)
                 continue
 
-        cur_scores = get_scores(imgs)
+        detected = get_detections(used_files, imgs)
+        results.extend(detected)
 
-        pickle_outputs(i, used_files, cur_scores)
+        # cur_scores = get_scores(imgs)
+        
+
+        
+
+        # pickle_outputs(i, used_files, cur_scores)
 
         # scores.loc[b] = cur_scores
-        # if i % 10:
-        # scores.round(3).to_csv(save_fn)
+        if i % 2 == 0:
+            cur_df = pd.DataFrame(results, 
+                                  columns=COLUMN_NAMES)
+            cur_df.to_csv(save_file, index=False, header=False, mode="a")
 
         for i in imgs:
             i.close()
