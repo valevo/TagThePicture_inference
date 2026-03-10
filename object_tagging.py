@@ -184,10 +184,15 @@ def main():
             cur_df = pd.DataFrame(results, 
                                   columns=COLUMN_NAMES)
             cur_df.to_csv(save_file, index=False, header=False, mode="a")
+            results = []
 
         for i in imgs:
             i.close()
 
+    cur_df = pd.DataFrame(results, 
+                                  columns=COLUMN_NAMES)
+    cur_df.to_csv(save_file, index=False, header=False, mode="a")
+    results = []
 
 if __name__ == "__main__":
     main()
