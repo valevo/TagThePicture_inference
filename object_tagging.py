@@ -111,11 +111,9 @@ def main():
     print("Initialising model...")
     print(f"Loading Checkpoint: {args.checkpoint} to {device}")
 
-    model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint).to(
-        device
-    )
-    model.eval()
     processor = AutoProcessor.from_pretrained(args.checkpoint)
+    model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint).to(device)
+    # model.eval()
 
     ############################################################################
     ############################# APPLY ########################################
