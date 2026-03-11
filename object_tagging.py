@@ -1,5 +1,4 @@
 import os
-import pickle
 import argparse
 from glob import glob
 from PIL import Image
@@ -10,11 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 
 import torch
-from transformers import AutoProcessor, AutoModel, AutoModelForZeroShotObjectDetection
-
-# checkpoint = "openai/clip-vit-large-patch14"
-# checkpoint = "gzomer/clip-multilingual"
-# checkpoint = "google/siglip-so400m-patch14-384"
+from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 
 
 def main():
@@ -72,7 +67,6 @@ def main():
 
     image_dir = Path(args.images)
 
-
     image_files = glob(str(image_dir / "*.jpg"))
     image_files = pd.Series(sorted(image_files), name="filename").apply(
         lambda f: os.path.basename(f)
@@ -80,7 +74,16 @@ def main():
 
     save_file = Path(args.output)
 
-    COLUMN_NAMES = ["filename", "score", "box_x0", "box_y0", "box_x1", "box_y1", "tag", "tag_index"]
+    COLUMN_NAMES = [
+        "filename",
+        "score",
+        "box_x0",
+        "box_y0",
+        "box_x1",
+        "box_y1",
+        "tag",
+        "tag_index",
+    ]
 
     if os.path.exists(save_file):
         df = pd.read_csv(save_file)
@@ -88,22 +91,8 @@ def main():
         # skip = scores[(scores.abs() > 0.0).sum(1) == len(scores.columns)].index
         image_files = image_files[~image_files.isin(skip)]
         print(f"SKIPPING {len(skip)} images, as they already have scores!")
-    else: 
+    else:
         pd.DataFrame([], columns=COLUMN_NAMES).to_csv(save_file, index=False)
-        
-
-
-    # if not os.path.exists(save_fn):
-    #     print(f"Creating {save_fn}...")
-    #     scores = np.zeros((len(image_files), len(tags)))
-    #     scores = pd.DataFrame(scores, index=image_files.tolist(), columns=tags)
-    #     scores.to_csv(save_fn, index=True)
-    # else:
-    #     print(f"{save_fn} exists, checking which files to skip...")
-        # scores = pd.read_csv(save_fn).set_index("filename")
-        # skip = scores[(scores.abs() > 0.0).sum(1) == len(scores.columns)].index
-
-
 
     ############################################################################
     ############################# INIT MODEL ###################################
@@ -112,8 +101,10 @@ def main():
     print(f"Loading Checkpoint: {args.checkpoint} to {device}")
 
     processor = AutoProcessor.from_pretrained(args.checkpoint)
-    model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint).to(device)
-    # model.eval()
+    model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint).to(
+        device
+    )
+    model.eval()
 
     ############################################################################
     ############################# APPLY ########################################
@@ -125,33 +116,32 @@ def main():
             outputs = model(**inputs)
         return outputs
 
-
     def get_detections(files, imgs):
         outputs = get_scores(imgs)
-        
+
         detections = processor.post_process_grounded_object_detection(
-            outputs, threshold=0.1, 
-            target_sizes=[(i.height, i.width) for i in imgs], 
-            text_labels=[tags]*len(imgs)
+            outputs,
+            threshold=0.1,
+            target_sizes=[(i.height, i.width) for i in imgs],
+            text_labels=[tags] * len(imgs),
         )
 
         recs = []
         for f, cur in zip(files, detections):
-            zipped = zip(cur["scores"], cur["boxes"], cur["text_labels"], cur["labels"], range(20))
-            for s, b, l, l_id, j in zipped:
-                recs.append([f, round(float(s), 3), *map(int, b), l, int(l_id)])
+            zipped = zip(
+                cur["scores"],
+                cur["boxes"],
+                cur["text_labels"],
+                cur["labels"],
+                range(20),
+            )
+            for s, b, l_, l_id, _ in zipped:
+                recs.append([f, round(float(s), 3), *map(int, b), l_, int(l_id)])
 
         return recs
- 
 
-    
     print(f"Number of image_files: {len(image_files)}")
     batches = np.array_split(image_files, len(image_files) // args.batch_size)
-
-    def pickle_outputs(iteration_number, filenames, outputs):
-        to_pickle = (tuple(filenames), outputs)
-        with open(save_folder / f"outputs_{iteration_number:04d}.pkl", "wb") as handle:
-            pickle.dump(to_pickle, handle)
 
     results = []
     for i, b in enumerate(tqdm(batches)):
@@ -169,27 +159,17 @@ def main():
         detected = get_detections(used_files, imgs)
         results.extend(detected)
 
-        # cur_scores = get_scores(imgs)
-        
-
-        
-
-        # pickle_outputs(i, used_files, cur_scores)
-
-        # scores.loc[b] = cur_scores
         if i % 10 == 0:
-            cur_df = pd.DataFrame(results, 
-                                  columns=COLUMN_NAMES)
+            cur_df = pd.DataFrame(results, columns=COLUMN_NAMES)
             cur_df.to_csv(save_file, index=False, header=False, mode="a")
             results = []
 
         for i in imgs:
             i.close()
 
-    cur_df = pd.DataFrame(results, 
-                                  columns=COLUMN_NAMES)
+    cur_df = pd.DataFrame(results, columns=COLUMN_NAMES)
     cur_df.to_csv(save_file, index=False, header=False, mode="a")
-    results = []
+
 
 if __name__ == "__main__":
     main()
