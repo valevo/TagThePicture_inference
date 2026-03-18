@@ -98,20 +98,16 @@ def main():
     else:
         pd.DataFrame([], columns=COLUMN_NAMES).to_csv(save_file, index=False)
 
-
-
     from transformers import pipeline
-    
+
     # Use any checkpoint from the hf.co/models?pipeline_tag=zero-shot-object-detection
 
     device = 1 if torch.cuda.is_available() else -1
     checkpoint = "iSEE-Laboratory/llmdet_large"
     checkpoint = "IDEA-Research/grounding-dino-base"
-    detector = pipeline(model=checkpoint, 
-                        task="zero-shot-object-detection",
-                       device=1)
+    checkpoint = args.checkpoint
+    detector = pipeline(model=checkpoint, task="zero-shot-object-detection", device=1)
 
-    
     results = []
     for f in tqdm(image_files):
         img = Image.open(image_dir / f)  # .convert("RGB")
@@ -124,21 +120,20 @@ def main():
             threshold=0.1,
         )
 
-        recs = []
-        for f, cur in zip(files, detections):
-            zipped = zip(
-                cur["scores"],
-                cur["boxes"],
-                cur["text_labels"],
-                cur["labels"],
-                range(20),
-            )
-            for s, b, l_, l_id, _ in zipped:
-                recs.append([f, round(float(s), 3), *map(int, b), l_, int(l_id)])
-
-        results.extend(recs)
-
-
+        # recs = []
+        # for f, cur in zip(files, detections):
+        #     zipped = zip(
+        #         cur["scores"],
+        #         cur["boxes"],
+        #         cur["text_labels"],
+        #         cur["labels"],
+        #         range(20),
+        #     )
+        #     for s, b, l_, l_id, _ in zipped:
+        #         recs.append([f, round(float(s), 3), *map(int, b), l_, int(l_id)])
+        #
+        # results.extend(recs)
 
 
-        
+if __name__ == "__main__":
+    main()

@@ -70,6 +70,7 @@ def main():
     tags = list(terms[term_heading])
 
     image_dir = Path(args.images)
+    print(f"image_dir: {image_dir}")
 
     image_files = glob(str(image_dir / "*.jpg"))
     image_files = pd.Series(image_files, name="filename").apply(
@@ -99,16 +100,17 @@ def main():
         pd.DataFrame([], columns=COLUMN_NAMES).to_csv(save_file, index=False)
 
     num_workers = 4
-    image_queue = queue.Queue(num_workers * 32)
+    image_queue = queue.Queue(num_workers * 16)
 
     def loader_worker(paths):
         print("Loader worker started")
         for path in paths:
             try:
-                img = Image.open(image_dir / path)  # .convert("RGB")
+                img = Image.open(image_dir / path)
                 img.load()
-                img = img.convert("RGB")
-                image_queue.put((path, img))
+                img_size = (img.height, img.width)
+                img = img.convert("RGB").resize((960, 960))
+                image_queue.put((path, img, img_size))
             except Exception as e:
                 print(f"Loader failed on path {path}: {e}")
                 continue
@@ -138,7 +140,7 @@ def main():
     ############################################################################
     ############################# APPLY ########################################
 
-    batch_queue = queue.Queue(16)
+    batch_queue = queue.Queue(32)
 
     def assembler():
         print("Batch Assember started")
@@ -151,10 +153,10 @@ def main():
         while not finished:
             while len(imgs) < args.batch_size:
                 try:
-                    file, img = image_queue.get(timeout=1)
+                    file, img, img_size = image_queue.get(timeout=1)
                     imgs.append(img)
                     files.append(file)
-                    img_sizes.append((img.height, img.width))
+                    img_sizes.append(img_size)
                 except queue.Empty:
                     # check if threads are finished
                     working = any([t.is_alive() for t in threads])
@@ -166,8 +168,13 @@ def main():
                     finished = True
                     break
 
+            if len(imgs) == 0:
+                break
+
             start = time()
-            inputs = processor_asm(text=tags, images=imgs, return_tensors="pt")
+            inputs = processor_asm(
+                text=tags, images=imgs, return_tensors="pt", do_resize=True
+            )
             elapsed = time() - start
             if elapsed > 10:
                 print(f"[assembler] processor took {elapsed:.2f}s")
@@ -180,7 +187,7 @@ def main():
 
     assembler_threads = []
 
-    for _ in range(4):
+    for _ in range(2):
         assembler_thread = threading.Thread(target=assembler, daemon=True)
         assembler_thread.start()
         assembler_threads.append(assembler_thread)
@@ -189,10 +196,12 @@ def main():
     batch_count = 0
 
     print(f"Number of image_files: {len(image_files)}")
-    pbar = tqdm(total=len(image_files) // args.batch_size)
+    total_batches = len(image_files) // args.batch_size
+    pbar = tqdm(total=total_batches)
 
     time_stats = {"batch": [], "model": [], "recs": [], "post": []}
     start = time()
+    checkpoint_start = time()
     while True:
         try:
             batch = batch_queue.get(timeout=1)
@@ -247,8 +256,10 @@ def main():
             cur_df.to_csv(save_file, index=False, header=False, mode="a")
             results = []
             save_time = time() - start
+            checkpoint_time = time() - checkpoint_start
 
-            print(f"Time report for batch {batch_count}:")
+            print(f"\nTime report for batch {batch_count}/{total_batches} ({100*batch_count/total_batches:.2f}%):")
+            print(f"  Checkpoint completed in {checkpoint_time:.2f}s, [{checkpoint_time/10:.2f}s/it]")
             print(
                 f"  Mean:  Batch: {(sum(time_stats['batch']) / 10):.2f}s   Model: {(sum(time_stats['model']) / 10):.2f}s   Rec: {(sum(time_stats['recs']) / 10):.2f}s   Post: {(sum(time_stats['post']) / 10):.2f}s"
             )
@@ -257,6 +268,8 @@ def main():
             )
             print(f"  CSV write time: {save_time:.2f}s")
             time_stats = {"batch": [], "model": [], "recs": [], "post": []}
+
+            checkpoint_start = time()
 
         batch_count += 1
         pbar.update(1)
