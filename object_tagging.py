@@ -244,7 +244,7 @@ def main():
                 cur["labels"],
                 range(20),
             )
-            for s, b, l_, l_id, _ in zipped:
+            for s, b, l_, l_id, _ in sorted(zipped, key=lambda t: t[0], reverse=True):
                 recs.append([f, round(float(s), 3), *map(int, b), l_, int(l_id)])
 
         results.extend(recs)
