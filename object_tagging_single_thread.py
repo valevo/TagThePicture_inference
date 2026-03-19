@@ -1,7 +1,7 @@
 import os
 import argparse
+import time
 from glob import glob
-from time import time
 from PIL import Image
 from pathlib import Path
 
@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 import torch
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+
 
 def get_inputs(path, filenames, processor):
     loaded_images = []
@@ -30,15 +31,11 @@ def get_inputs(path, filenames, processor):
             print(f"Loader failed on path {path}: {e}")
             continue
 
-
-    inputs = processor( 
-                images=loaded_images, 
-                return_tensors="pt", do_resize=True
-            )
+    inputs = processor(images=loaded_images, return_tensors="pt", do_resize=True)
 
     for im in loaded_images:
         im.close()
-        
+
     return inputs, loaded_names, original_sizes
 
 
@@ -48,7 +45,7 @@ def main():
     parser.add_argument(
         "checkpoint",
         help="Model checkpoint to load; no default.",
-        default="google/owlv2-base-patch16"
+        default="google/owlv2-base-patch16",
     )
 
     parser.add_argument(
@@ -80,7 +77,7 @@ def main():
     )
 
     args = parser.parse_args()
-    
+
     if args.device:
         device = args.device
     else:
@@ -106,7 +103,6 @@ def main():
 
     save_file = Path(args.output)
 
-
     COLUMN_NAMES = [
         "filename",
         "score",
@@ -127,8 +123,6 @@ def main():
     else:
         pd.DataFrame([], columns=COLUMN_NAMES).to_csv(save_file, index=False)
 
-
-
     processor = AutoProcessor.from_pretrained(args.checkpoint)
     torch.backends.cudnn.benchmark = True
     model = AutoModelForZeroShotObjectDetection.from_pretrained(args.checkpoint).to(
@@ -136,22 +130,18 @@ def main():
     )
     model.eval()
 
-
-
     total_batches = len(image_files) // args.batch_size
     batches = np.array_split(image_files, total_batches)
-    # pbar = tqdm(total=total_batches)
 
     results = []
 
+    t0 = time.time()
     for batch_count, batch_filenames in enumerate(tqdm(batches)):
+        inputs, loaded_files, original_sizes = get_inputs(
+            image_dir, batch_filenames, processor
+        )
+        text_inputs = processor(text=[tags] * len(loaded_files), return_tensors="pt")
 
-        inputs, loaded_files, original_sizes = get_inputs(image_dir, 
-                                                        batch_filenames, 
-                                                        processor)
-        text_inputs = processor(text=[tags]*len(loaded_files), return_tensors="pt")
-
-        
         inputs = inputs | text_inputs
 
         with torch.inference_mode():
@@ -160,16 +150,14 @@ def main():
         detections = processor.post_process_grounded_object_detection(
             outputs,
             threshold=0.1,
-            #target_sizes=original_sizes,  # [(i.height, i.width) for i in imgs],
+            # target_sizes=original_sizes,  # [(i.height, i.width) for i in imgs],
             text_labels=[tags] * len(loaded_files),
         )
 
-
-
         for f, cur in zip(loaded_files, detections):
             zipped = zip(
-                cur["scores"].numpy().round(3),
-                cur["boxes"].numpy().astype(int),
+                cur["scores"].cpu().numpy().round(3),
+                cur["boxes"].cpu().numpy().round(3),
                 cur["text_labels"],
                 cur["labels"],
             )
@@ -177,16 +165,20 @@ def main():
             for (s, b, l_, l_id), i in zipped:
                 results.append([f, s, *b, l_, i])
 
-        
-        if batch_count % 1 == 0:# and batch_count > 0:
+        if batch_count % 10 == 0:  # and batch_count > 0:
+            t1 = time.time()
+            elapsed = t1 - t0
+            print()
+            print(
+                f"{batch_count:04d}/{total_batches:04d} {elapsed / 3600:.2f}hrs [{(batch_count + 1) / elapsed:.2f}it/s]",
+                flush=True,
+            )
             cur_df = pd.DataFrame(results, columns=COLUMN_NAMES)
             cur_df.to_csv(save_file, index=False, header=False, mode="a")
             results = []
 
-
     cur_df = pd.DataFrame(results, columns=COLUMN_NAMES)
     cur_df.to_csv(save_file, index=False, header=False, mode="a")
-
 
 
 if __name__ == "__main__":
