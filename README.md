@@ -1,3 +1,5 @@
 # TagThePicture_inference
 
-[future work](./docs/future_work.md)
+
+### future work
+[increasing recall](./docs/increasing_recall.md)
