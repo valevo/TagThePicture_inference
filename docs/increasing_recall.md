@@ -1,6 +1,6 @@
 # Increasing Recall
 
-_current version: 11.08.2026_
+_current version: 21.09.2026_
 
 Among the possible avenues to improve the tagging system in the repository, the most prominent is increasing recall (see below), increasing the coverage of tags and mainly the coverage of images that receive a tags at all. In our first tagging round, we decided on a precision cutoff of around 15% (see below) and this lead to more than half of the images in our 
 
