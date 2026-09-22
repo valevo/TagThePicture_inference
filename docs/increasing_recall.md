@@ -9,7 +9,7 @@ Among the possible avenues to improve the tagging system in the repository, the 
 
  - Two basic types of mistakes are typically distinguished: false positives (related to **_precision_**), which is when tag is applied to an image that is wrong, and false negatives (related to **_recall_**), which means that a tag wasn't applied that would have been correct. The two types are in a proper trade-off, since applying more tags automatically leads to more false positives and fewer false negatives, and vice-versa. The former type is the "worse" kind of mistake because it leads to misleading information in the collection, but also somewhat "easier" to detect and estimate. The latter, despite being relatively "unproblematic" because tagging is somewhat "optional", is very hard to estimate.
 
- - In fact, recall is virtually impossible to accurately estimate for the task at hand. Precision can be fairly easily gauged: given an image and a tag for that image, precision is about deciding whether that tag should indeed have been applied to it. The precision of a set of images as a whole is then (in a very simpli  
+ - In fact, recall is virtually impossible to accurately estimate for the task at hand. Whereas given an image and a candidate tag applied by a tagging system, it is fairly straightforward to decide whether that was correct. The opposite, however, finding all tags that should have applied but were not, is  
    
  - There is quite a lot of inherent ambiguity in the tagging task -- for example, a "Ruin" could also be a "Palace", "Temple", etc. On the opposite, "River" and "Flood" are conceptually mutually exclusive but may visually be impossible to distinguish. This is reflected in the relatively high annotator-disagreement in the tags from the [TagThePicture platform](https://tagthepicture.nl/); when humans are not sure or don't agree on whether a certain tag applies or does not apply, neither can an automated system.
    
@@ -17,7 +17,7 @@ Among the possible avenues to improve the tagging system in the repository, the 
 
 ## Thesaurus
 
-Tags are (with a few exceptions) directly taken from the Wereldmuseum's [thesaurus](https://collectie.wereldmuseum.nl/thesaurus). Every entry in the thesaurus is a concept, which has on or more labels mainly in Dutch and English, and has one parent (broader) concept and potentially one or more child (narrower) concepts. In the initial step, English-language labels have been literally given to the language models, and the thesaurus' structure been discarded. It is worth noting, that (1) concepts seldomly have more than 1 (meaningfully different) label and (2) the tag set of TagThePicture contains only few internal relationships from the thesaurus.
+Tags are (with a few exceptions) directly taken from the Wereldmuseum's [thesaurus](https://collectie.wereldmuseum.nl/thesaurus). Every entry in the thesaurus is a concept, which has one or more labels mainly in Dutch and English, and has one parent (broader) concept and potentially one or more child (narrower) concepts. In the initial step, English-language labels have been literally given to the language models, and the thesaurus' structure been discarded. It is worth noting, that (1) concepts seldomly have more than 1 (meaningfully different) label and (2) the tag set of TagThePicture contains only few internal relationships from the thesaurus.
 
 Ways to improve the tag set itself can include:
 
